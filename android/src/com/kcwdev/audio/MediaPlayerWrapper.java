@@ -248,13 +248,23 @@ public class MediaPlayerWrapper
 	{
 		try {
 			if (mp != null) {
-
+				
 				mp.setOnCompletionListener(null);
 				mp.setOnErrorListener(null);
 				mp.setOnBufferingUpdateListener(null);
 				mp.setOnInfoListener(null);
 				mp.setOnPreparedListener(null);
-
+				
+				/*
+				 * Restore STREAM_MUSIC
+				 */
+				if (android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.KITKAT) {
+					Context context = proxy.getActivity().getBaseContext();
+					AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+					am.setMode(AudioManager.USE_DEFAULT_STREAM_TYPE);
+					am.setSpeakerphoneOn(true);				     
+				}
+					
 				mp.release();
 				mp = null;
 				if (DBG) {
