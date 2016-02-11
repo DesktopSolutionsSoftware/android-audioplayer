@@ -11,7 +11,10 @@ import org.appcelerator.titanium.TiContext.OnLifecycleEvent;
 import org.appcelerator.titanium.util.Log;
 import org.appcelerator.titanium.util.TiConfig;
 import org.appcelerator.titanium.util.TiConvert;
+
 import android.app.Activity;
+import android.content.Context;
+import android.media.AudioManager;
 
 @Kroll.proxy(creatableInModule=AdvancedAudioPlayerModule.class)
 public class AudioPlayerProxy extends KrollProxy

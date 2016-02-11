@@ -256,7 +256,7 @@ public class MediaPlayerWrapper
 				mp.setOnPreparedListener(null);
 				
 				/*
-				 * Restore STREAM_MUSIC
+				 * Restore default stream type
 				 */
 				if (android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.KITKAT) {
 					Context context = proxy.getActivity().getBaseContext();
