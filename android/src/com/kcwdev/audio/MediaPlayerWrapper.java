@@ -385,7 +385,10 @@ public class MediaPlayerWrapper
 			           break;
 			
 			           case (AudioManager.AUDIOFOCUS_LOSS) :
-				           stop();
+				           	stop();
+			           		am.setMode(AudioManager.STREAM_MUSIC);
+			           		am.setSpeakerphoneOn(true);
+			           		am.setMode(AudioManager.USE_DEFAULT_STREAM_TYPE);
 			           break;
 			
 			           case (AudioManager.AUDIOFOCUS_GAIN) :
