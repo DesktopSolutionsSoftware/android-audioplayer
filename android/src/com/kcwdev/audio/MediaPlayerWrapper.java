@@ -17,6 +17,7 @@ import org.appcelerator.titanium.util.TiConvert;
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.media.AudioManager;
+import android.media.AudioManager.OnAudioFocusChangeListener;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.webkit.URLUtil;
@@ -63,6 +64,8 @@ public class MediaPlayerWrapper
 
 	protected KrollProxy proxy;
 	protected MediaPlayer mp;
+	protected AudioManager am;
+	protected Context context;
 	protected float volume;
 	protected boolean speakerphone;
 	protected boolean playOnResume;
@@ -79,6 +82,9 @@ public class MediaPlayerWrapper
 		{
 			this.initialize();			
 		}
+		
+		context = proxy.getActivity().getBaseContext();
+		am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
 	}
 
 	protected void initialize()
@@ -89,7 +95,6 @@ public class MediaPlayerWrapper
 			mp = new MediaPlayer();
 			String url = TiConvert.toString(proxy.getProperty(TiC.PROPERTY_URL));
 			if (URLUtil.isAssetUrl(url)) {
-				Context context = proxy.getActivity().getApplicationContext();
 				String path = url.substring(TiConvert.ASSET_URL.length());
 				AssetFileDescriptor afd = null;
 				try {
@@ -179,6 +184,8 @@ public class MediaPlayerWrapper
 	{
 		try {
 			if (mp != null) {
+				am.setMode(AudioManager.USE_DEFAULT_STREAM_TYPE);
+				am.setSpeakerphoneOn(true);				  
 				if(mp.isPlaying()) {
 					if (DBG) {
 						Log.d(LCAT,"audio is playing, pause");
@@ -208,6 +215,46 @@ public class MediaPlayerWrapper
 					if (DBG) {
 						Log.d(LCAT, "Play: Volume set to " + volume);
 					}
+					
+					OnAudioFocusChangeListener focusChangeListener =
+						new OnAudioFocusChangeListener() {
+					    	public void onAudioFocusChange(int focusChange) {
+					    		switch (focusChange) {
+					
+					    			case (AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) :
+					    				// Lower the volume while ducking.
+					    				mp.setVolume(0.2f, 0.2f);
+					    				break;
+						           case (AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) :
+						        	   pause();
+						           break;
+					
+						           case (AudioManager.AUDIOFOCUS_LOSS) :
+							           	stop();
+						           break;
+						
+						           case (AudioManager.AUDIOFOCUS_GAIN) :
+							           // Return the volume to normal and resume if paused.
+							           mp.setVolume(1f, 1f);
+							           play();
+						           break;
+						           
+						           default:
+						        	   // Nothing 
+						        	   break;
+					    		}
+					      }
+					};
+					
+					am.requestAudioFocus(focusChangeListener, (speakerphone) ? AudioManager.STREAM_MUSIC : AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN);
+
+					if(!speakerphone) {
+						am.setMode(AudioManager.STREAM_VOICE_CALL);
+						am.setSpeakerphoneOn(false);
+					} else {
+						am.setSpeakerphoneOn(true);
+					}
+					
 					mp.start();
 					setState(STATE_PLAYING);
 					paused = false;
@@ -259,8 +306,6 @@ public class MediaPlayerWrapper
 				 * Restore default stream type
 				 */
 				if (android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.KITKAT) {
-					Context context = proxy.getActivity().getBaseContext();
-					AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
 					am.setMode(AudioManager.USE_DEFAULT_STREAM_TYPE);
 					am.setSpeakerphoneOn(true);				     
 				}
@@ -353,31 +398,30 @@ public class MediaPlayerWrapper
 		proxy.setProperty(TiC.PROPERTY_TIME, position);
 	}
 	
+	/**
+	 * Sets the speaker mode. This can only be called once per instance of the player (i.e. when
+	 * it is initializing). 
+	 */
 	public void setSpeakerphoneOn() {		
 		if (mp != null) {
-			
-			Context context = proxy.getActivity().getBaseContext();
-			AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
 			
 			speakerphone = true; 
 			if(proxy.hasProperty("speakerphone")) {
 				speakerphone = TiConvert.toBoolean(proxy.getProperty("speakerphone"));
 			}
 			
-			if(speakerphone) {
+			if(speakerphone) 
+			{
 				mp.setAudioStreamType(AudioManager.STREAM_MUSIC);
-				if (android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.KITKAT) {
-					am.setMode(AudioManager.STREAM_MUSIC);
-					am.setSpeakerphoneOn(true);				     
-				}
-				
-			} else {
+				am.setMode(AudioManager.USE_DEFAULT_STREAM_TYPE);
+				am.setSpeakerphoneOn(true);				     
+			} 
+			
+			else 
+			{
 				mp.setAudioStreamType(AudioManager.STREAM_VOICE_CALL);
-				if (android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.KITKAT) {
-					am.setMode(AudioManager.MODE_IN_CALL);
-					am.setSpeakerphoneOn(false);
-				}
-				
+				am.setMode(AudioManager.STREAM_VOICE_CALL);
+				am.setSpeakerphoneOn(false);
 			}
 		}
 	}
@@ -387,7 +431,8 @@ public class MediaPlayerWrapper
 		proxy.setProperty("state", state);
 		String stateDescription = "";
 
-		switch(state) {
+		switch(state) 
+		{
 			case STATE_BUFFERING :
 				stateDescription = STATE_BUFFERING_DESC;
 				break;
@@ -418,7 +463,8 @@ public class MediaPlayerWrapper
 		}
 
 		proxy.setProperty("stateDescription", stateDescription);
-		if (DBG) {
+		if (DBG) 
+		{
 			Log.d(LCAT, "Audio state changed: " + stateDescription);
 		}
 
@@ -431,33 +477,49 @@ public class MediaPlayerWrapper
 
 	public void stop()
 	{
-		try {
-			if (mp != null) {
+		try 
+		{
+			if (mp != null) 
+			{
 
-				if (mp.isPlaying() || isPaused()) {
-					if (DBG) {
+				if (mp.isPlaying() || isPaused()) 
+				{
+					if (DBG) 
+					{
 						Log.d(LCAT, "audio is playing, stop()");
 					}
 					setState(STATE_STOPPING);
 					mp.stop();
+					
+					am.setMode(AudioManager.USE_DEFAULT_STREAM_TYPE);
+					am.setSpeakerphoneOn(true);				  
+	           		
 					setState(STATE_STOPPED);
 					//if (remote) {
 						stopProgressTimer();
 					//}
-					try {
+					try
+					{
 						mp.prepare();
-					} catch (IOException e) {
+					} 
+					catch (IOException e) 
+					{
 						Log.e(LCAT,"Error while preparing audio after stop(). Ignoring.");
-					} catch (IllegalStateException e) {
+					} 
+					catch (IllegalStateException e) 
+					{
 						Log.w(LCAT, "Error while preparing audio after stop(). Ignoring.");
 					}
 				}
 
-				if(isPaused()) {
+				if(isPaused()) 
+				{
 					paused = false;
 				}
 			}
-		} catch (Throwable t) {
+		} 
+		catch (Throwable t) 
+		{
 			Log.e(LCAT, "Error : " , t);
 		}
 	}
@@ -466,6 +528,8 @@ public class MediaPlayerWrapper
 	public void onCompletion(MediaPlayer mp)
 	{
 		proxy.fireEvent(EVENT_COMPLETE, null);
+		am.setMode(AudioManager.USE_DEFAULT_STREAM_TYPE);
+		am.setSpeakerphoneOn(true);				  
 		stop();
 	}
 
@@ -474,7 +538,8 @@ public class MediaPlayerWrapper
 	{
 		String msg = "OnInfo Unknown media issue.";
 
-		switch(what) {
+		switch(what) 
+		{
 			case MediaPlayer.MEDIA_INFO_BAD_INTERLEAVING :
 				msg = "Stream not interleaved or interleaved improperly.";
 				break;
@@ -506,7 +571,8 @@ public class MediaPlayerWrapper
 	{
 		int code = 0;
 		String msg = "Unknown media error.";
-		if (what == MediaPlayer.MEDIA_ERROR_SERVER_DIED) {
+		if (what == MediaPlayer.MEDIA_ERROR_SERVER_DIED) 
+		{
 			msg = "Media server died";
 		}
 		release();
@@ -522,7 +588,8 @@ public class MediaPlayerWrapper
 	@Override
 	public void onBufferingUpdate(MediaPlayer mp, int percent)
 	{
-		if (DBG) {
+		if (DBG) 
+		{
 			Log.d(LCAT, "Buffering: " + percent + "%");
 		}
 		
@@ -531,10 +598,14 @@ public class MediaPlayerWrapper
 		proxy.fireEvent(EVENT_BUFFERING, data);
 	}
 
-	public int getCurrentPosition() {
-		if (mp != null) {
+	public int getCurrentPosition() 
+	{
+		if (mp != null) 
+		{
 			return mp.getCurrentPosition();
-		} else {
+		} 
+		else 
+		{
 			return 0;
 		}
 	}
@@ -542,9 +613,12 @@ public class MediaPlayerWrapper
 	
 	private void startProgressTimer()
 	{
-		if (progressTimer == null) {
+		if (progressTimer == null) 
+		{
 			progressTimer = new Timer(true);
-		} else {
+		} 
+		else 
+		{
 			progressTimer.cancel();
 			progressTimer = new Timer(true);
 		}
@@ -552,10 +626,13 @@ public class MediaPlayerWrapper
 		progressTimer.schedule(new TimerTask()
 		{
 			@Override
-			public void run() {
-				if (mp != null && mp.isPlaying()) {
+			public void run() 
+			{
+				if (mp != null && mp.isPlaying()) 
+				{
 					int position = mp.getCurrentPosition();
-					if (DBG) {
+					if (DBG) 
+					{
 						Log.d(LCAT, "Progress: " + position);
 					}
 					KrollDict event = new KrollDict();
@@ -568,7 +645,8 @@ public class MediaPlayerWrapper
 
 	private void stopProgressTimer()
 	{
-		if (progressTimer != null) {
+		if (progressTimer != null) 
+		{
 			progressTimer.cancel();
 			progressTimer = null;
 		}
@@ -576,7 +654,8 @@ public class MediaPlayerWrapper
 
 	public void onDestroy()
 	{
-		if (mp != null) {
+		if (mp != null) 
+		{
 			mp.release();
 			mp = null;
 		}
@@ -585,8 +664,10 @@ public class MediaPlayerWrapper
 
 	public void onPause()
 	{
-		if (mp != null) {
-			if (isPlaying()) {
+		if (mp != null) 
+		{
+			if (isPlaying()) 
+			{
 				pause();
 				playOnResume = true;
 			}
@@ -595,8 +676,10 @@ public class MediaPlayerWrapper
 
 	public void onResume()
 	{
-		if (mp != null) {
-			if (playOnResume) {
+		if (mp != null) 
+		{
+			if (playOnResume) 
+			{
 				play();
 				playOnResume = false;
 			}
