@@ -64,6 +64,8 @@ public class MediaPlayerWrapper
 
 	protected KrollProxy proxy;
 	protected MediaPlayer mp;
+	protected AudioManager am;
+	protected Context context;
 	protected float volume;
 	protected boolean speakerphone;
 	protected boolean playOnResume;
@@ -80,6 +82,9 @@ public class MediaPlayerWrapper
 		{
 			this.initialize();			
 		}
+		
+		context = proxy.getActivity().getBaseContext();
+		am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
 	}
 
 	protected void initialize()
@@ -90,7 +95,6 @@ public class MediaPlayerWrapper
 			mp = new MediaPlayer();
 			String url = TiConvert.toString(proxy.getProperty(TiC.PROPERTY_URL));
 			if (URLUtil.isAssetUrl(url)) {
-				Context context = proxy.getActivity().getApplicationContext();
 				String path = url.substring(TiConvert.ASSET_URL.length());
 				AssetFileDescriptor afd = null;
 				try {
@@ -180,6 +184,8 @@ public class MediaPlayerWrapper
 	{
 		try {
 			if (mp != null) {
+				am.setMode(AudioManager.USE_DEFAULT_STREAM_TYPE);
+				am.setSpeakerphoneOn(true);				  
 				if(mp.isPlaying()) {
 					if (DBG) {
 						Log.d(LCAT,"audio is playing, pause");
@@ -209,6 +215,46 @@ public class MediaPlayerWrapper
 					if (DBG) {
 						Log.d(LCAT, "Play: Volume set to " + volume);
 					}
+					
+					OnAudioFocusChangeListener focusChangeListener =
+						new OnAudioFocusChangeListener() {
+					    	public void onAudioFocusChange(int focusChange) {
+					    		switch (focusChange) {
+					
+					    			case (AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) :
+					    				// Lower the volume while ducking.
+					    				mp.setVolume(0.2f, 0.2f);
+					    				break;
+						           case (AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) :
+						        	   pause();
+						           break;
+					
+						           case (AudioManager.AUDIOFOCUS_LOSS) :
+							           	stop();
+						           break;
+						
+						           case (AudioManager.AUDIOFOCUS_GAIN) :
+							           // Return the volume to normal and resume if paused.
+							           mp.setVolume(1f, 1f);
+							           play();
+						           break;
+						           
+						           default:
+						        	   // Nothing 
+						        	   break;
+					    		}
+					      }
+					};
+					
+					am.requestAudioFocus(focusChangeListener, (speakerphone) ? AudioManager.STREAM_MUSIC : AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN);
+
+					if(!speakerphone) {
+						am.setMode(AudioManager.STREAM_VOICE_CALL);
+						am.setSpeakerphoneOn(false);
+					} else {
+						am.setSpeakerphoneOn(true);
+					}
+					
 					mp.start();
 					setState(STATE_PLAYING);
 					paused = false;
@@ -260,8 +306,6 @@ public class MediaPlayerWrapper
 				 * Restore default stream type
 				 */
 				if (android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.KITKAT) {
-					Context context = proxy.getActivity().getBaseContext();
-					AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
 					am.setMode(AudioManager.USE_DEFAULT_STREAM_TYPE);
 					am.setSpeakerphoneOn(true);				     
 				}
@@ -361,98 +405,23 @@ public class MediaPlayerWrapper
 	public void setSpeakerphoneOn() {		
 		if (mp != null) {
 			
-			Context context = proxy.getActivity().getBaseContext();
-			AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-			
 			speakerphone = true; 
 			if(proxy.hasProperty("speakerphone")) {
 				speakerphone = TiConvert.toBoolean(proxy.getProperty("speakerphone"));
 			}
 			
-			OnAudioFocusChangeListener focusChangeListener =
-		      new OnAudioFocusChangeListener() {
-			      public void onAudioFocusChange(int focusChange) {
-			    	Context context = proxy.getActivity().getBaseContext();
-			    	AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-			        switch (focusChange) {
-			
-			           case (AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) :
-				           // Lower the volume while ducking.
-				           mp.setVolume(0.2f, 0.2f);
-			           break;
-			           case (AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) :
-			        	   pause();
-			           break;
-			
-			           case (AudioManager.AUDIOFOCUS_LOSS) :
-				           	stop();
-			           		am.setMode(AudioManager.STREAM_MUSIC);
-			           		am.setSpeakerphoneOn(true);
-			           		am.setMode(AudioManager.USE_DEFAULT_STREAM_TYPE);
-			           break;
-			
-			           case (AudioManager.AUDIOFOCUS_GAIN) :
-				           // Return the volume to normal and resume if paused.
-				           mp.setVolume(1f, 1f);
-				           mp.start();
-			           break;
-			           
-			           default: break;
-			        }
-			      }
-			};
-			
 			if(speakerphone) 
 			{
 				mp.setAudioStreamType(AudioManager.STREAM_MUSIC);
-				/*
-				 * Android newer than KitKat requires we try and override the global audio routing
-				 * We'll request audio focus while setting the mode in order to stop audio from other applications.
-				 * If we can't get focus, tough, our media player needs to be initialized with the audio mode so as a
-				 * fail-safe we'll be forced to take the other audio with us.  
-				 */
-				if (android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.KITKAT) 
-				{
-					int result = am.requestAudioFocus(focusChangeListener,
-						// Use the music stream.
-						AudioManager.STREAM_MUSIC,
-						// Request permanent focus.
-						AudioManager.AUDIOFOCUS_GAIN
-					);
-					
-					// As mentioned, if we can't get focus then continue setting the mode. Mode will be restored
-					// to the default when this media player is disposed of. Yes, this means our media player may
-					// play alongside other apps.
-					if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) 
-					{
-						am.setMode(AudioManager.STREAM_MUSIC);
-					}
-					
-				}
-				
+				am.setMode(AudioManager.USE_DEFAULT_STREAM_TYPE);
 				am.setSpeakerphoneOn(true);				     
-				
 			} 
 			
 			else 
-			
 			{
 				mp.setAudioStreamType(AudioManager.STREAM_VOICE_CALL);
-				if (android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.KITKAT) {
-					
-					int result = am.requestAudioFocus(focusChangeListener,
-						AudioManager.MODE_IN_COMMUNICATION,
-						AudioManager.AUDIOFOCUS_GAIN
-					);
-						
-					if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-						am.setMode(AudioManager.MODE_IN_COMMUNICATION);
-					}
-						
-				}
-				
+				am.setMode(AudioManager.STREAM_VOICE_CALL);
 				am.setSpeakerphoneOn(false);
-				
 			}
 		}
 	}
@@ -521,6 +490,10 @@ public class MediaPlayerWrapper
 					}
 					setState(STATE_STOPPING);
 					mp.stop();
+					
+					am.setMode(AudioManager.USE_DEFAULT_STREAM_TYPE);
+					am.setSpeakerphoneOn(true);				  
+	           		
 					setState(STATE_STOPPED);
 					//if (remote) {
 						stopProgressTimer();
@@ -555,6 +528,8 @@ public class MediaPlayerWrapper
 	public void onCompletion(MediaPlayer mp)
 	{
 		proxy.fireEvent(EVENT_COMPLETE, null);
+		am.setMode(AudioManager.USE_DEFAULT_STREAM_TYPE);
+		am.setSpeakerphoneOn(true);				  
 		stop();
 	}
 
