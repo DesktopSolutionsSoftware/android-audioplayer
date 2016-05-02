@@ -11,3 +11,7 @@ This is an extended version of [com.kcwdev.audio](https://github.com/kcwdevllc/a
 Contributing 
 ============
 Anything from a bug report to a pull request is greatly appreciated :)
+
+Downloading
+============
+Download tagged releases if you're planning to use this in your project. Master branch may contain untested revisions.
