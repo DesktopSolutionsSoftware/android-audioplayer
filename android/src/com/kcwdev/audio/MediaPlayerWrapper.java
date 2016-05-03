@@ -138,7 +138,7 @@ public class MediaPlayerWrapper
 				}
 			}
 			
-			setSpeakerphoneOn();
+			setSpeakerphoneOn(); // Configures initial audio routing
 			
 			mp.setLooping(looping);
 			mp.setOnCompletionListener(this);
@@ -399,21 +399,24 @@ public class MediaPlayerWrapper
 	}
 	
 	/**
-	 * Sets the speaker mode. This can only be called once per instance of the player (i.e. when
-	 * it is initializing). 
+	 * Sets the speaker mode for this MediaPlayer.
+	 * Must be called at the start; can only be declared once.
 	 */
 	public void setSpeakerphoneOn() {		
 		if (mp != null) {
 			
-			speakerphone = true; 
-			if(proxy.hasProperty("speakerphone")) {
+			speakerphone = true; // Default value is on 
+			
+			if(proxy.hasProperty("speakerphone")) 
+			{
+				// See if we specified a custom property when calling the module
 				speakerphone = TiConvert.toBoolean(proxy.getProperty("speakerphone"));
 			}
 			
 			if(speakerphone) 
 			{
 				mp.setAudioStreamType(AudioManager.STREAM_MUSIC);
-				am.setMode(AudioManager.USE_DEFAULT_STREAM_TYPE);
+				am.setMode(AudioManager.STREAM_MUSIC);
 				am.setSpeakerphoneOn(true);				     
 			} 
 			
