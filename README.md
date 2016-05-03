@@ -1,5 +1,3 @@
-### This project is not under active development. Pull requests are welcome!
-
 com.kcwdev.audio
 ===========================================
 
@@ -7,10 +5,11 @@ Exposes `android.media.MediaPlayer` to Titanium for developing advanced media pl
 
 This is an extended version of [com.kcwdev.audio](https://github.com/kcwdevllc/android-audioplayer). It adds the ability to toggle routing of audio through the phone's main speaker and ear speaker.
 
-
 Contributing 
 ============
-Anything from a bug report to a pull request is greatly appreciated :)
+Bug reports, pull requests, and even just notes that the module works on your device are greatly helpful and appreciated.
+
+The APIs to develop this speaker toggle have changed throughout versions of Android and documentation throughout the internet is highly inconsistent as a result. Knowing whether or not this works on your particular device and OS version is a huge help.
 
 Downloading
 ============
