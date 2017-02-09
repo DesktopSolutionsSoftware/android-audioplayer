@@ -1,6 +1,6 @@
 This project is no longer under active development but pull requests are welcomed and will be reviewed!
 
-Note: This module was not built with and therefore currently is not compatible with TiSDK 6.1.0 on Android.
+Note: This module was not built with and therefore currently is not compatible with TiSDK >= 6.0.1 on Android.
 
 com.kcwdev.audio
 ===========================================
